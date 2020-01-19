@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<product productid="remindermail" active="1">
+	<title>Inactive User Reminder Emails</title>
+	<description>Sends emails out to inactive users encouraging them to re-visit the forum</description>
+	<version>2.2.1</version>
+	<url>http://www.vbulletin.org/forum/showthread.php?t=237531</url>
+	<versioncheckurl />
+	<dependencies>
+		<dependency dependencytype="vbulletin" minversion="4.0.0" maxversion="" />
+	</dependencies>
+	<codes>
+		<code version="1.1.4">
+			<installcode><![CDATA[$db->hide_errors();
+$db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` ADD `emailDate`  int(10)  NOT NULL DEFAULT '0'");
+$db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` ADD `emailCount` int(10) NOT NULL DEFAULT '0'");
+$db->show_errors();]]></installcode>
+			<uninstallcode><![CDATA[$db->hide_errors();
+$db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` DROP `emailDate`");
+$db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` DROP `emailCount`");
+$db->show_errors();]]></uninstallcode>
+		</code>
+		<code version="2.1.1">
+			<installcode><![CDATA[$db->hide_errors(); 
+$db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` ADD `inactiveuseroptions` INT( 10 ) UNSIGNED NOT NULL DEFAULT '1' AFTER `options`"); 
+require_once(DIR . '/includes/class_bitfield_builder.php');  
+$myobj =& vB_Bitfield_Builder::init(); 
+$myobj->save($db); 
+build_forum_permissions();  
+$db->query_write("DROP TABLE IF EXISTS " . TABLE_PREFIX . "inactiveuserlog;");
+$db->query_write("CREATE TABLE ". TABLE_PREFIX . "inactiveuserlog (
+  id          int AUTO_INCREMENT NOT NULL,
+  username    varchar(100) NOT NULL,
+  userid      int(10) UNSIGNED NOT NULL,
+  dateline    int(10) UNSIGNED NOT NULL,
+  email       varchar(100) NOT NULL,
+  validemail  varchar(1) NOT NULL,
+  /* Keys */
+  PRIMARY KEY (id)
+) ENGINE = MyISAM;");
+
+$db->show_errors();]]></installcode>
+			<uninstallcode><![CDATA[$db->hide_errors(); 
+$db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` DROP `inactiveuseroptions`"); 
+require_once(DIR . '/includes/class_bitfield_builder.php');  
+$myobj =& vB_Bitfield_Builder::init(); 
+$myobj->save($db); 
+build_forum_permissions(); 
+$db->query_write("DROP TABLE IF EXISTS " . TABLE_PREFIX . "inactiveuserlog;");
+$db->show_errors();]]></uninstallcode>
+		</code>
+		<code version="2.1.5">
+			<installcode><![CDATA[$db->hide_errors(); 
+require_once(DIR . '/includes/functions_remindermail.php');  
+
+if (field_exists('user', 'emailDate') === true) 
+{ 
+    $db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` CHANGE `emailDate` `rmEmailDate`  int(10)  NOT NULL DEFAULT '0'");
+}
+else
+{
+    $db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` ADD `rmEmailDate`  int(10)  NOT NULL DEFAULT '0'");
+}
+
+if (field_exists('user', 'emailCount') === true) 
+{ 
+    $db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` CHANGE `emailCount` `rmEmailCount`  int(10)  NOT NULL DEFAULT '0'");
+}
+else
+{
+    $db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` ADD `rmEmailCount`  int(10)  NOT NULL DEFAULT '0'");
+}
+
+if (field_exists('user', 'inactiveuseroptions') === true) 
+{ 
+    $db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` DROP `inactiveuseroptions`"); 
+}
+
+$db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` ADD `rmoptout`  smallint NOT NULL DEFAULT '0'");
+
+$db->show_errors();]]></installcode>
+			<uninstallcode><![CDATA[$db->hide_errors(); 
+
+$db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` DROP `rmEmailDate`"); 
+$db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` DROP `rmEmailCount`"); 
+$db->query_write("ALTER TABLE `" . TABLE_PREFIX . "user` DROP `rmoptout`"); 
+$db->query_write("DROP TABLE IF EXISTS " . TABLE_PREFIX . "inactiveuserlog;");
+$db->show_errors();]]></uninstallcode>
+		</code>
+	</codes>
+	<templates>
+	</templates>
+	<stylevardfns>
+	</stylevardfns>
+	<stylevars>
+	</stylevars>
+	<plugins>
+		<plugin active="1" executionorder="5">
+			<title>ADMCP: Usergroup Checkbox Processing</title>
+			<hookname>admin_options_processing</hookname>
+			<phpcode><![CDATA[if (is_array($settings['reminder_usergroups'])) 
+{ 
+    $settings['reminder_usergroups'] = implode(',', $settings['reminder_usergroups']); 
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Reset Returning Inactive User</title>
+			<hookname>global_bootstrap_init_start</hookname>
+			<phpcode><![CDATA[$userid = $vbulletin->userinfo['userid'];
+$sql = "SELECT * FROM " .TABLE_PREFIX. "user WHERE rmEmailDate > 0 AND rmEmailCount > 0 AND userid = $userid";
+$result = $db->query_first($sql);
+$thisuser = $vbulletin->db->fetch_array($result);
+if(!empty($thisuser))
+{
+    $sql = "UPDATE " .TABLE_PREFIX. "user SET rmEmailDate = 0, rmEmailCount = 0 WHERE userid = $userid";
+    $db->query_write($sql);
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Email Format:  HTML Switching</title>
+			<hookname>mail_send</hookname>
+			<phpcode><![CDATA[if ($vbulletin->session->vars['CRONTASK_REMINDERMAIL'] == 1 )
+{
+
+  if (strtolower($vbulletin->options['reminder_emailformat']) == 'html')
+  {
+     $headers = str_replace('Content-Type: text/plain', 'Content-Type: text/html', $headers);
+  }
+
+}]]></phpcode>
+		</plugin>
+	</plugins>
+	<phrases>
+		<phrasetype name="Scheduled Tasks" fieldname="cron">
+			<phrase name="task_emailreminder_desc" date="1305473326" username="Jim" version="2.1.5"><![CDATA[Sends email to encourage  inactive users to become more active.]]></phrase>
+			<phrase name="task_emailreminder_log" date="1305473326" username="Jim" version="2.1.5"><![CDATA[Inactivity Reminder Email:]]></phrase>
+			<phrase name="task_emailreminder_title" date="1305473326" username="Jim" version="2.1.5"><![CDATA[Inactive User Reminder Emails]]></phrase>
+		</phrasetype>
+		<phrasetype name="Email Body Text" fieldname="emailbody">
+			<phrase name="inactivity_reminder_html" date="1305347598" username="Jim" version="2.1.5b"><![CDATA[<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+</head>
+<body>
+<div style="font-family: Verdana, Arial, Helvetica; color: #000000; font-size: 9pt;">
+<b>Hello $username!</b>
+<br />
+<br /> 
+We've noticed that you have not been active on $bbtitle for quite some time now.<br />
+<br />
+Could we not tempt you back?
+<br />
+<br />
+<br /> 
+<div><br />
+<b>If you don't remember your password, you can request it here:</b> <a href="$forumurl/login.php?do=lostpw" target="_blank" title="Lost Password">Lost Password</a>
+<br /><br />
+We hope to see you on $bbtitle soon! 
+</div>
+<br />
+<b>Kindest Regards,</b>
+<br />
+<a href="$homeurl" target="_blank" title="$bbtitle">$bbtitle</a> 
+</div>
+<br />
+<br />
+<div>
+<table style="font-family: Verdana, Arial, Helvetica;font-size: 8pt;" border="0" cellspacing="0" cellpadding="2" width="600">
+<tr>
+<td style="padding: 6px 0px 12px 0px;" width="100%" colspan="5" align="left" valign="top">
+<b>$bbtitle - {Site Description here} </b></td>
+</tr>
+<tr>
+<td align="right" valign="middle"><img src="$forumurl/images/icons/icon_url.gif" /></td>
+<td width="50%" align="left" valign="middle"><a href="$forumurl/content.php" target="_blank">$bbtitle News</a></td>
+<td width="20" align="center" valign="middle">&nbsp;&nbsp;&nbsp;&nbsp;</td>
+<td align="right" valign="middle"><img src="$forumurl/images/icons/icon_group.gif" /></td>
+<td width="50%" align="left" valign="middle"><a href="$forumurl/forum.php" target="_blank">$bbtitle Forums</a></td>
+</tr>
+<tr>
+<td>&nbsp;</td>
+<td align="left" valign="top">Get the latest site news.</td>
+<td align="center" valign="middle" width="20">&nbsp;</td>
+<td>&nbsp;</td>
+<td align="left" valign="top">Participate in our forums.</td>
+</tr>
+<tr>
+<td width="100%" colspan="5" align="center" valign="middle">&nbsp;</td>
+</tr>
+<tr>
+<td align="right" valign="middle"><img src="$forumurl/images/icons/camera.gif" /></td>
+<td width="50%" align="left" valign="middle"><a href="$forumurl/gallery/" target="_blank">$bbtitle Gallery</a></td>
+<td align="center" valign="middle" width="20">&nbsp;</td>
+<td align="right" valign="middle"><img src="$forumurl/images/icons/dollar2.gif" /></td>
+<td width="50%" align="left" valign="middle"><a href="$forumurl/classifieds/" target="_blank">$bbtitle Classifieds</a></td>
+</tr>
+<tr>
+<td>&nbsp;</td>
+<td align="left" valign="top">Browse our pictures and videos.</td>
+<td align="center" valign="middle" width="20">&nbsp;</td>
+<td>&nbsp;</td>
+<td align="left" valign="top">Got something for sale? Need a part? Post your ad in our classifieds.</td>
+</tr>
+</table>
+</div>
+<hr />
+To stop receiving this email, click <a href="$forumurl/optout-reminders.php?u=$userid&e=$email" title="unsubscribe" target="_blank">unsubscribe</a>
+</body>
+</html>]]></phrase>
+			<phrase name="inactivity_reminder_plaintext" date="1305347706" username="Jim" version="2.1.5b"><![CDATA[Hello, $username!
+
+We've noticed that you've not been active on $bbtitle for quite some time now, and we miss you!
+  
+Could we not tempt you back?
+
+If you don't remember your password, you can request it here: $forumurl/login.php?do=lostpw
+We hope to see you soon
+
+Kindest Regards
+$bbtitle
+$homeurl
+
+To stop receiving this email, visit this URL: $forumurl/optout-reminders.php?u=$userid&e=$email" ]]></phrase>
+		</phrasetype>
+		<phrasetype name="Email Subject Text" fieldname="emailsubject">
+			<phrase name="inactivity_reminder_html" date="1268605161" username="Jim" version="1.1.4"><![CDATA[$username! We miss you at $bbtitle!]]></phrase>
+			<phrase name="inactivity_reminder_plaintext" date="1268603989" username="Jim" version="1.1.4"><![CDATA[$username! We miss you at $bbtitle!]]></phrase>
+		</phrasetype>
+		<phrasetype name="Error Messages" fieldname="error">
+			<phrase name="error_unsubscribed_already" date="1269327058" username="administrator" version="2.0.1"><![CDATA[Our records indicate that your subscription to our mailing list has already been cancelled. Please <a href="{1}" rel="nofollow">contact an Administrator</a> if you believe you've reached this message in error.]]></phrase>
+			<phrase name="pruned_inactivitylog_successfully" date="1306718212" username="Jim" version="2.2.0"><![CDATA[Pruned Inactivity Log Successfully]]></phrase>
+		</phrasetype>
+		<phrasetype name="Logging Tools" fieldname="logging">
+			<phrase name="are_you_sure_you_want_to_prune_x_log_entries_from_inactivity_log" date="1305542893" username="Jim" version="2.1.5"><![CDATA[Are you sure you want to prune {1} log entries from the inactivity log?]]></phrase>
+			<phrase name="inactivity_log_viewer_page_x_y_there_are_z_total_log_entries" date="1269600431" username="administrator" version="2.1.0"><![CDATA[Inactivity Log Viewer (page {1}/{2}) | There are {3} total log entries.]]></phrase>
+			<phrase name="pruned_inactivitylog_successfully" date="1269602109" username="administrator" version="2.1.0"><![CDATA[Pruned Inactivity Log Successfully]]></phrase>
+		</phrasetype>
+		<phrasetype name="User Tools (global)" fieldname="user">
+			<phrase name="receive_inactivity_reminder_email_description" date="1269223320" username="administrator" version="2.0.1"><![CDATA[Members will receive an email if they have been inactive for more than {1} days. If you do not wish to receive these emails, you may optout by unchecking this option.]]></phrase>
+			<phrase name="receive_inactivity_reminder_email_from_administrators" date="1269221031" username="administrator" version="2.0.1"><![CDATA[Receive Inactivity Reminder Email from Administrators]]></phrase>
+		</phrasetype>
+		<phrasetype name="vBulletin Settings" fieldname="vbsettings">
+			<phrase name="setting_reminder_batch_desc" date="1305471686" username="Jim" version="2.1.5"><![CDATA[<div>This to prevent bottlenecks when sending lots of email. Use this option to specify how many emails will be sent per batch. (0 for unlimited)</div><br />
+<div>The higher the number, the slower your board will run, but the more users will be processed in a shorter period.  If you have a large board, with a large amount of inactive members compared to a smaller forum,  setting this to a low number may help performance.</div>]]></phrase>
+			<phrase name="setting_reminder_batch_title" date="1305471686" username="Jim" version="2.1.5"><![CDATA[Number of Reminder Emails to Send Per Batch]]></phrase>
+			<phrase name="setting_reminder_disablereport_desc" date="1305350044" username="Jim" version="2.1.5b"><![CDATA[If this is set to YES, the Inactive User Admin Report will be sent.]]></phrase>
+			<phrase name="setting_reminder_disablereport_title" date="1305350044" username="Jim" version="2.1.5b"><![CDATA[Enable Admin Email Report]]></phrase>
+			<phrase name="setting_reminder_emailformat_desc" date="1269350235" username="administrator" version="2.0.1"><![CDATA[<div>Change the format of reminder emails by setting this to either TEXT or HTML. To alter or translate reminder email, use the following links:</div><br /> 
+<fieldset>
+<legend>TEXT</legend>
+[<a href="phrase.php?do=edit&amp;e[emailsubject][inactivity_reminder_plaintext]" target="_blank">Email Subject</a>] 
+[<a href="phrase.php?do=edit&amp;e[emailbody][inactivity_reminder_plaintext]" target="_blank">Email Body</a>]<br />
+</fieldset>
+<br/>
+<fieldset>
+<legend>HTML</legend>
+[<a href="phrase.php?do=edit&amp;e[emailsubject][inactivity_reminder_html]" target="_blank">Email Subject</a>] 
+[<a href="phrase.php?do=edit&amp;e[emailbody][inactivity_reminder_html]" target="_blank">Email Body</a>]<br />
+</fieldset>]]></phrase>
+			<phrase name="setting_reminder_emailformat_title" date="1269350235" username="administrator" version="2.0.1"><![CDATA[Email Format]]></phrase>
+			<phrase name="setting_reminder_enabled_desc" date="1268564042" username="Jim" version="1.1.4"><![CDATA[<div>Enable Product? (Yes/No):</div>]]></phrase>
+			<phrase name="setting_reminder_enabled_title" date="1268564042" username="Jim" version="1.1.4"><![CDATA[Enable Inactive User Reminder Emails]]></phrase>
+			<phrase name="setting_reminder_excludeduserids_desc" date="1305406975" username="Jim" version="2.1.5b"><![CDATA[<div>List the userids that you do not wish to send reminder email to here. <br/>
+Separate Userids with a comma.  i.e. 1,2,3,4</div>]]></phrase>
+			<phrase name="setting_reminder_excludeduserids_title" date="1305406975" username="Jim" version="2.1.5b"><![CDATA[Excluded User IDs]]></phrase>
+			<phrase name="setting_reminder_frequency_desc" date="1305471160" username="Jim" version="2.1.5"><![CDATA[<div>How often should reminder email be sent once a member has become inactive (in days):</div><br />
+<div>If <span style="font-weight:bold;margin-top:1em;">Only Send Once</span> option is set to <span style="font-weight:bold;margin-top:1em;">YES</span>, this option will be ignored.</div><br/>
+<div>Please note, this is <span style="font-weight:bold;margin-top:1em;">HOW OFTEN</span>, not <span style="font-weight:bold;margin-top:1em;">TOTAL</span>.  If you enter 1 here, your users will be reminded <span style="font-weight:bold;margin-top:1em;">EVERY DAY</span>. Try setting this to something higher such as 30 if you wish emails to be sent out less often.</div>]]></phrase>
+			<phrase name="setting_reminder_frequency_title" date="1305471160" username="Jim" version="2.1.5"><![CDATA[How often should we send reminder email]]></phrase>
+			<phrase name="setting_reminder_inactivitygraceperiod_desc" date="1305471127" username="Jim" version="2.1.5"><![CDATA[<div class="smallfont">How many days before a user is considered inactive?</div>
+Default: 30]]></phrase>
+			<phrase name="setting_reminder_inactivitygraceperiod_title" date="1305471127" username="Jim" version="2.1.5"><![CDATA[Inactivity Grace Period]]></phrase>
+			<phrase name="setting_reminder_logduration_desc" date="1301620835" username="Jim" version="2.1.1"><![CDATA[How many days would you like to keep in the log?]]></phrase>
+			<phrase name="setting_reminder_logduration_title" date="1301620835" username="Jim" version="2.1.1"><![CDATA[Inactivity Log Duration]]></phrase>
+			<phrase name="setting_reminder_logenabled_desc" date="1301620780" username="Jim" version="2.1.1"><![CDATA[<div>Do you want to keep a track of the users that have been sent an inactivity reminder email?</div>]]></phrase>
+			<phrase name="setting_reminder_logenabled_title" date="1301620780" username="Jim" version="2.1.1"><![CDATA[Enable Logging]]></phrase>
+			<phrase name="setting_reminder_maxemails_desc" date="1305471362" username="Jim" version="2.1.5"><![CDATA[<div>How many total reminders should an inactive users receive? (0 for unlimited)</div>]]></phrase>
+			<phrase name="setting_reminder_maxemails_title" date="1305471362" username="Jim" version="2.1.5"><![CDATA[Maximum Email To Send]]></phrase>
+			<phrase name="setting_reminder_sendonce_desc" date="1305471372" username="Jim" version="2.1.5"><![CDATA[<div>If set to <span style="font-weight:bold;margin-top:1em;">Yes</span>, an reminder email will only be sent once and never send it again. </div>
+<div>If set to <span style="font-weight:bold;margin-top:1em;">No</span>, the total set in the <span style="font-weight:bold;margin-top:1em;">Maximum Email To Send</span> below will be used.</div>]]></phrase>
+			<phrase name="setting_reminder_sendonce_title" date="1305471372" username="Jim" version="2.1.5"><![CDATA[Only Send Once?]]></phrase>
+			<phrase name="setting_reminder_usergroups_desc" date="1301686978" username="Jim" version="2.1.1"><![CDATA[<div>Which usergroups do you want to monitor for inactivity?</div>]]></phrase>
+			<phrase name="setting_reminder_usergroups_title" date="1301686978" username="Jim" version="2.1.1"><![CDATA[Usergroups]]></phrase>
+			<phrase name="settinggroup_remindermail" date="1267624270" username="Jim" version="1.1.4"><![CDATA[Inactive User Reminder Emails]]></phrase>
+		</phrasetype>
+	</phrases>
+	<options>
+		<settinggroup name="remindermail" displayorder="719">
+			<setting varname="reminder_enabled" displayorder="10">
+				<datatype>boolean</datatype>
+				<optioncode>yesno</optioncode>
+				<defaultvalue>no</defaultvalue>
+			</setting>
+			<setting varname="reminder_sendonce" displayorder="24">
+				<datatype>boolean</datatype>
+				<optioncode>yesno</optioncode>
+				<defaultvalue>no</defaultvalue>
+			</setting>
+			<setting varname="reminder_maxemails" displayorder="25">
+				<datatype>number</datatype>
+				<validationcode><![CDATA[return ($data >= 0);]]></validationcode>
+				<defaultvalue>0</defaultvalue>
+			</setting>
+			<setting varname="reminder_inactivitygraceperiod" displayorder="26">
+				<datatype>number</datatype>
+				<validationcode><![CDATA[return ($data > 0);]]></validationcode>
+				<defaultvalue>30</defaultvalue>
+			</setting>
+			<setting varname="reminder_batch" displayorder="27">
+				<datatype>number</datatype>
+				<validationcode><![CDATA[return ($data >= 0);]]></validationcode>
+				<defaultvalue>10</defaultvalue>
+			</setting>
+			<setting varname="reminder_frequency" displayorder="28">
+				<datatype>number</datatype>
+				<validationcode><![CDATA[return ($data > 0);]]></validationcode>
+				<defaultvalue>30</defaultvalue>
+			</setting>
+			<setting varname="reminder_usergroups" displayorder="30">
+				<datatype>free</datatype>
+				<optioncode><![CDATA[" . eval('$options =""; 
+foreach($vbulletin->usergroupcache AS $usergroupid => $usergroup)
+{
+	$options .= "\\t\\t<label for=\\"setting[$setting[varname]]$usergroupid\\" title=\\"usergroupid: $usergroupid\\"><input type=\\"checkbox\\" tabindex=\\"1\\" name=\\"setting[$setting[varname]]"."[]\\" id=\\"setting[$setting[varname]]$usergroupid\\" value=\\"$usergroupid\\"" . iif(strpos(",$setting[value],", ",$usergroupid,") !== false, \' checked="checked"\') . iif($vbulletin->debug, " title=\\"name=&quot;setting[$setting[varname]]&quot;\\"") . " />$usergroup[title]</label><br />\\n";
+}
+return "<span class=\\"smallfont\\">\\n$options\\t</span>";') . "<input type=\"hidden\" name=\"setting[$setting[varname]][]\" value=\"-1\" />]]></optioncode>
+			</setting>
+			<setting varname="reminder_excludeduserids" displayorder="40">
+				<datatype>free</datatype>
+			</setting>
+			<setting varname="reminder_emailformat" displayorder="50">
+				<datatype>free</datatype>
+				<optioncode>select:piped
+text|TEXT
+html|HTML</optioncode>
+				<defaultvalue>text</defaultvalue>
+			</setting>
+			<setting varname="reminder_disablereport" displayorder="55">
+				<datatype>boolean</datatype>
+				<optioncode>yesno</optioncode>
+				<defaultvalue>no</defaultvalue>
+			</setting>
+			<setting varname="reminder_logenabled" displayorder="110">
+				<datatype>boolean</datatype>
+				<optioncode>yesno</optioncode>
+				<defaultvalue>1</defaultvalue>
+			</setting>
+			<setting varname="reminder_logduration" displayorder="120">
+				<datatype>number</datatype>
+				<validationcode><![CDATA[return ($data > 0);]]></validationcode>
+				<defaultvalue>30</defaultvalue>
+			</setting>
+		</settinggroup>
+	</options>
+	<helptopics>
+	</helptopics>
+	<cronentries>
+		<cron varname="emailreminder" active="1" loglevel="1">
+			<filename>./includes/cron/process_inactive_members.php</filename>
+			<scheduling weekday="-1" day="-1" hour="1" minute="30" />
+		</cron>
+	</cronentries>
+	<faqentries>
+	</faqentries>
+</product>

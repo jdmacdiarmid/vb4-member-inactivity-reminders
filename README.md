@@ -1,8 +1,8 @@
-#EMAIL REMINDERS FOR INACTIVE USERS v2.2.1 
-This extension is for vBulletin v3.8 and up.
-
 # About vBulletin
 vBulletin is a proprietary Internet forum software package sold by MH Sub I, LLC doing business as vBulletin. It is written in PHP and uses a MySQL database server. Similar products include XenForo, WordPress, Joomla, Drupal, MyBB, and phpBB.
+
+# EMAIL REMINDERS FOR INACTIVE USERS v2.2.1 
+This extension is for vBulletin v3.8 and up.
 
 ## Credits
 
@@ -63,6 +63,7 @@ Opt-Out Feature for members - Include an opt-out link in reminder email. (Thanks
 * If you have a previous version of this mod installed, I strongly recommend backing up your reminder email subject and body. This mod will over-write any changes you made to them. 
 * In Version 2.x, Reminder Email Contents has been moved to using vbphrases. Look in the install.txt file with this upload for a list of phrases used in this mod.
 
+
 1. Upload file in the upload folder to your server
 2. If you have installed one of the old versions, you will need to uninstall it.
 3. Go to Plugs & Products -> Product Manager -> Add New Product.
@@ -75,22 +76,22 @@ it can be disabled via the AdminCP. If you find this mod useful, please don't di
 
 ### Update 
 
-** UpDate 2.2.0 **
+**UpDate 2.2.0**
 * Removed logic to base inactivity on Last Post or Last Visit date. Inactivity is now based on 
 Last Activity Date. 
 * Removed option to select what to base inactivity on from the mod settings screen. 
 * Fixed a couple typos in SQL update queries.
 * Exporting the following additional values which can be used in reminder email templates if desired:
-  $lastvisit 	- Formatted Date/Time Value - members last visit to the site.
+  $lastvisit  - Formatted Date/Time Value - members last visit to the site.
   $lastactivity - Formatted Date/Time Value - members last activity on the site.
-  $lastpost	- Formatted Date/Time Value - members last post date on the site.
+  $lastpost - Formatted Date/Time Value - members last post date on the site.
   $lastreminder - Formatted Date/Time Value - Date member was sent last reminder email.
   $days_since_lastpost - Number of days since member last posted.
   $days_since_lastreminder - number of days since last reminder was sent.
 
 Please let me know if you would like other values made available. 
 
-** Update 2.1.5**
+** Update 2.1.5 **
 
 * Full Rewrite - Mod no longer has the option of adding a footer credit to the end of 
   your website nor will it add a footer credit to outgoing emails. Enable/Disable options
